@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechFix Pro - Layanan Service Laptop</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QRCode.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Pengaturan Cetak Nota Profesional Ukuran A4 */
+        #printArea { display: none; }
+        @media print {
+            @page {
+                size: A4;
+                margin: 15mm;
+            }
+            body * { display: none !important; }
+            #printArea, #printArea * { display: block !important; visibility: visible !important; }
+            #printArea { 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%; 
+                background: white; 
+                z-index: 9999;
+                font-family: 'Inter', sans-serif;
+                color: #1e293b;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- NAVBAR -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('user')">
+                <div class="bg-indigo-600 text-white p-2 rounded-lg shadow-md">
+                    <i class="fa-solid fa-laptop-code text-xl"></i>
+                </div>
+                <span class="font-bold text-xl tracking-tight text-slate-900">TechFix<span class="text-indigo-600">Pro</span></span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button onclick="switchView('user')" id="navUserBtn" class="text-sm font-medium px-3 py-2 rounded-lg text-indigo-600 bg-indigo-50 transition">Cek Status</button>
+                <button onclick="checkAdminAccess()" id="navAdminBtn" class="text-sm font-medium px-3 py-2 rounded-lg text-slate-600 hover:text-indigo-600 transition">
+                    <i class="fa-solid fa-lock mr-1"></i> Admin
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- VIEW: USER / LACAK STATUS -->
+        <div id="viewUser" class="max-w-xl mx-auto space-y-6">
+            <div class="text-center space-y-2">
+                <h1 class="text-3xl font-bold tracking-tight text-slate-900">Lacak Status Service Laptop</h1>
+                <p class="text-slate-500">Masukkan kode unik atau pindai QR Code yang tertera pada nota.</p>
+            </div>
+
+            <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Kode Unik Service</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="trackCodeInput" placeholder="Contoh: ABC123XYZ" class="flex-grow px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase font-mono tracking-wider">
+                        <button onclick="trackService()" id="trackBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-medium transition flex items-center justify-center min-w-[100px]">
+                            Lacak
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hasil Pencarian Status -->
+            <div id="trackResult" class="hidden bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+                <div class="border-b border-slate-100 pb-4 flex justify-between items-start">
+                    <div>
+                        <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md" id="resKode">---</span>
+                        <h2 class="text-xl font-bold text-slate-900 mt-2" id="resNama">---</h2>
+                        <p class="text-sm text-slate-500"><i class="fa-solid fa-laptop mr-1"></i> <span id="resLaptop">---</span></p>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Keluhan Kerusakan</p>
+                    <p class="text-sm bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-700" id="resKeluhan">---</p>
+                </div>
+
+                <!-- Indikator 3 Tahapan -->
+                <div class="space-y-3">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tahapan Pengerjaan</p>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div id="step1" class="p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-xs font-medium transition">
+                            <i class="fa-solid fa-clipboard-list text-base mb-1 block"></i> Belum Dikerjakan
+                        </div>
+                        <div id="step2" class="p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-xs font-medium transition">
+                            <i class="fa-solid fa-gears text-base mb-1 block"></i> Proses Dikerjakan
+                        </div>
+                        <div id="step3" class="p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-xs font-medium transition">
+                            <i class="fa-solid fa-circle-check text-base mb-1 block"></i> Selesai
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="trackError" class="hidden bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-xl text-center text-sm font-medium"></div>
+        </div>
+
+        <!-- VIEW: LOGIN ADMIN -->
+        <div id="viewLogin" class="hidden max-w-md mx-auto">
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+                <div class="text-center space-y-1">
+                    <div class="bg-indigo-50 text-indigo-600 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i class="fa-solid fa-lock text-lg"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold tracking-tight text-slate-900">Login Admin</h2>
+                    <p class="text-sm text-slate-500">Masuk untuk mengelola data service.</p>
+                </div>
+                <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
+                        <input type="text" id="adminUser" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                        <input type="password" id="adminPass" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <button type="submit" id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-medium transition shadow-sm">
+                        Masuk Dashboard
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- VIEW: DASHBOARD ADMIN -->
+        <div id="viewAdminDashboard" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-slate-900">Dashboard Admin</h1>
+                    <p class="text-sm text-slate-500">Kelola pendaftaran dan status service laptop pelanggan.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="openAddModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Tambah Service
+                    </button>
+                    <button onclick="handleLogout()" class="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-600 px-4 py-2.5 rounded-xl text-sm font-medium transition">
+                        <i class="fa-solid fa-right-from-bracket mr-1"></i> Keluar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Filter Kategori Status -->
+            <div class="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+                <button onclick="filterTab('ALL')" id="tabALL" class="px-4 py-2 rounded-xl text-sm font-semibold transition bg-indigo-600 text-white shadow-sm">Semua Unit</button>
+                <button onclick="filterTab('BELUM DI KERJAKAN')" id="tabBELUM" class="px-4 py-2 rounded-xl text-sm font-semibold transition bg-white text-slate-600 hover:bg-slate-100 border border-slate-200">Belum Dikerjakan</button>
+                <button onclick="filterTab('PROSES DIKERJAKAN')" id="tabPROSES" class="px-4 py-2 rounded-xl text-sm font-semibold transition bg-white text-slate-600 hover:bg-slate-100 border border-slate-200">Proses Dikerjakan</button>
+                <button onclick="filterTab('SELESAI')" id="tabSELESAI" class="px-4 py-2 rounded-xl text-sm font-semibold transition bg-white text-slate-600 hover:bg-slate-100 border border-slate-200">Selesai</button>
+            </div>
+
+            <!-- Tabel Data Service -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="p-4">Kode Unik</th>
+                                <th class="p-4">Nama Pelanggan</th>
+                                <th class="p-4">Laptop</th>
+                                <th class="p-4">Keluhan</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-center">Aksi / Cetak Nota</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminTableBody" class="divide-y divide-slate-100 text-sm">
+                            <tr>
+                                <td colspan="6" class="p-6 text-center text-slate-400">Memuat data dari database...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL TAMBAH SERVICE -->
+    <div id="addModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-6">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-4">
+                <h3 class="text-lg font-bold text-slate-900">Tambah Data Service Baru</h3>
+                <button onclick="closeAddModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <form id="addForm" onsubmit="handleAddService(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nama Pelanggan</label>
+                    <input type="text" id="addNama" required class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Merek & Tipe Laptop</label>
+                    <input type="text" id="addLaptop" required placeholder="Contoh: Asus ROG Strix" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Keluhan Kerusakan</label>
+                    <textarea id="addKeluhan" required rows="3" class="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button type="button" onclick="closeAddModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition">Batal</button>
+                    <button type="submit" id="submitAddBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition">Simpan & Buat Kode</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- AREA CETAK NOTA PROFESIONAL (UKURAN A4) -->
+    <div id="printArea" style="padding: 30px; border: 2px solid #0f172a; border-radius: 8px; max-width: 210mm; margin: auto;">
+        <!-- Header Nota -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 25px;">
+            <div>
+                <h1 style="font-size: 28px; font-weight: bold; margin: 0; color: #0f172a; text-transform: uppercase; letter-spacing: 1px;">TechFix Pro</h1>
+                <p style="font-size: 13px; color: #475569; margin: 4px 0 0 0;">Pusat Service & Perbaikan Laptop Profesional</p>
+            </div>
+            <div style="text-align: right;">
+                <h2 style="font-size: 18px; font-weight: bold; margin: 0; color: #4f46e5; text-transform: uppercase;">Nota Penerimaan Service</h2>
+                <p style="font-size: 12px; color: #64748b; margin: 4px 0 0 0;" id="printTanggal">Tanggal: ---</p>
+            </div>
+        </div>
+
+        <!-- Konten Utama Nota (2 Kolom: Detail & QR Code) -->
+        <div style="display: flex; gap: 40px; align-items: flex-start; margin-bottom: 40px;">
+            <!-- Kolom Kiri: Informasi Pelanggan -->
+            <div style="flex: 1;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr>
+                        <td style="padding: 10px 0; color: #64748b; width: 32%; font-weight: 500;">Kode Unik</td>
+                        <td style="padding: 10px 0; color: #64748b; width: 3%;">:</td>
+                        <td style="padding: 10px 0; font-weight: bold; font-family: monospace; font-size: 18px; color: #4f46e5;" id="printKode">---</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Nama Pelanggan</td>
+                        <td style="padding: 10px 0; color: #64748b;">:</td>
+                        <td style="padding: 10px 0; font-weight: bold; color: #0f172a; font-size: 15px;" id="printNama">---</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px 0; color: #64748b; font-weight: 500;">Merek / Laptop</td>
+                        <td style="padding: 10px 0; color: #64748b;">:</td>
+                        <td style="padding: 10px 0; font-weight: bold; color: #0f172a; font-size: 15px;" id="printLaptop">---</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px 0; color: #64748b; font-weight: 500; vertical-align: top;">Keluhan Kerusakan</td>
+                        <td style="padding: 10px 0; color: #64748b; vertical-align: top;">:</td>
+                        <td style="padding: 10px 0; color: #334155; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 14px;" id="printKeluhan">---</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Kolom Kanan: QR Code Pelacakan -->
+            <div style="width: 200px; text-align: center; background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px;">
+                <div id="qrcode" style="display: inline-block; background: white; padding: 6px; border-radius: 4px; margin-bottom: 10px;"></div>
+                <p style="font-size: 11px; font-weight: 600; color: #0f172a; margin: 0 0 4px 0;">SCAN STATUS</p>
+                <p style="font-size: 10px; color: #64748b; margin: 0; line-height: 1.4;">Arahkan kamera HP ke QR Code untuk cek proses perbaikan secara real-time.</p>
+            </div>
+        </div>
+
+        <!-- Catatan / Syarat Ketentuan & Tanda Tangan -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #cbd5e1; padding-top: 20px; font-size: 11px; color: #64748b;">
+            <div style="max-width: 65%;">
+                <strong style="color: #0f172a;">Syarat & Ketentuan Service:</strong>
+                <ol style="margin: 4px 0 0 15px; padding: 0; line-height: 1.4;">
+                    <li>Nota fisik ini wajib dibawa pada saat pengambilan unit laptop.</li>
+                    <li>Segala kerusakan atau kehilangan akibat lewat dari 30 hari setelah unit dinyatakan selesai bukan tanggung jawab kami.</li>
+                    <li>Garansi service berlaku 1 minggu setelah tanggal pengambilan untuk kasus perbaikan yang sama.</li>
+                </ol>
+            </div>
+            <div style="text-align: center; width: 180px;">
+                <p style="margin: 0 0 50px 0;">Penerima / Admin,</p>
+                <p style="margin: 0; font-weight: bold; border-bottom: 1px solid #0f172a; padding-bottom: 2px; color: #0f172a;">( TechFix Pro )</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-slate-200 bg-white py-6 mt-12 text-center text-sm text-slate-400 no-print">
+        &copy; 2026 TechFix Pro. Sistem Service Laptop Terpadu.
+    </footer>
+
+    <!-- LOGIC JAVASCRIPT -->
+    <script>
+        // --- KONFIGURASI URL GOOGLE APPS SCRIPT ANDA ---
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYVkJbkcPC_moFK_3XBK2svIaczDBPeDETyBSLjOV40frZk4nZsBaVbz7j8QRJ_nm8Vw/exec';
+
+        let allAdminData = []; 
+        let currentTabFilter = 'ALL';
+
+        async function callApi(payload) {
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify(payload)
+                });
+                return await response.json();
+            } catch (error) {
+                console.error("API Error:", error);
+                return { status: 'error', message: 'Gagal terhubung ke server database.' };
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const codeParam = urlParams.get('code');
+            if (codeParam) {
+                document.getElementById('trackCodeInput').value = codeParam;
+                switchView('user');
+                trackService();
+            }
+        });
+
+        function switchView(view) {
+            document.getElementById('viewUser').classList.add('hidden');
+            document.getElementById('viewLogin').classList.add('hidden');
+            document.getElementById('viewAdminDashboard').classList.add('hidden');
+
+            document.getElementById('navUserBtn').className = "text-sm font-medium px-3 py-2 rounded-lg text-slate-600 hover:text-indigo-600 transition";
+            document.getElementById('navAdminBtn').className = "text-sm font-medium px-3 py-2 rounded-lg text-slate-600 hover:text-indigo-600 transition";
+
+            if (view === 'user') {
+                document.getElementById('viewUser').classList.remove('hidden');
+                document.getElementById('navUserBtn').className = "text-sm font-medium px-3 py-2 rounded-lg text-indigo-600 bg-indigo-50 transition";
+            } else if (view === 'login') {
+                document.getElementById('viewLogin').classList.remove('hidden');
+            } else if (view === 'admin') {
+                document.getElementById('viewAdminDashboard').classList.remove('hidden');
+                document.getElementById('navAdminBtn').className = "text-sm font-medium px-3 py-2 rounded-lg text-indigo-600 bg-indigo-50 transition";
+                loadAdminData();
+            }
+        }
+
+        function checkAdminAccess() {
+            const token = sessionStorage.getItem('isAdminLoggedIn');
+            if (token === 'true') {
+                switchView('admin');
+            } else {
+                switchView('login');
+            }
+        }
+
+        async function trackService() {
+            const code = document.getElementById('trackCodeInput').value.trim();
+            const resultBox = document.getElementById('trackResult');
+            const errorBox = document.getElementById('trackError');
+            const trackBtn = document.getElementById('trackBtn');
+
+            if (!code) {
+                alert("Masukkan kode unik terlebih dahulu!");
+                return;
+            }
+
+            trackBtn.innerText = "Mencari...";
+            trackBtn.disabled = true;
+            resultBox.classList.add('hidden');
+            errorBox.classList.add('hidden');
+
+            const res = await callApi({ action: 'search', kode: code });
+
+            trackBtn.innerText = "Lacak";
+            trackBtn.disabled = false;
+
+            if (res.status === 'success' && res.data) {
+                const item = res.data;
+                document.getElementById('resKode').innerText = item.kode;
+                document.getElementById('resNama').innerText = item.nama;
+                document.getElementById('resLaptop').innerText = item.laptop;
+                document.getElementById('resKeluhan').innerText = item.keluhan;
+
+                updateStepIndicator(item.status);
+                resultBox.classList.remove('hidden');
+            } else {
+                errorBox.innerText = "Kode unik tidak ditemukan di database. Periksa kembali kode Anda.";
+                errorBox.classList.remove('hidden');
+            }
+        }
+
+        function updateStepIndicator(status) {
+            const s1 = document.getElementById('step1');
+            const s2 = document.getElementById('step2');
+            const s3 = document.getElementById('step3');
+
+            [s1, s2, s3].forEach(el => {
+                el.className = "p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-xs font-medium transition";
+            });
+
+            if (status === 'BELUM DI KERJAKAN') {
+                s1.className = "p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold shadow-xs";
+            } else if (status === 'PROSES DIKERJAKAN') {
+                s1.className = "p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold";
+                s2.className = "p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-semibold shadow-xs";
+            } else if (status === 'SELESAI') {
+                s1.className = "p-3 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold";
+                s2.className = "p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 text-xs font-semibold";
+                s3.className = "p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold shadow-xs";
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const user = document.getElementById('adminUser').value;
+            const pass = document.getElementById('adminPass').value;
+            const btn = document.getElementById('loginBtn');
+
+            btn.innerText = "Memeriksa...";
+            btn.disabled = true;
+
+            const res = await callApi({ action: 'login', username: user, password: pass });
+
+            btn.innerText = "Masuk Dashboard";
+            btn.disabled = false;
+
+            if (res.status === 'success' && res.isValid) {
+                sessionStorage.setItem('isAdminLoggedIn', 'true');
+                switchView('admin');
+            } else {
+                alert(res.message || "Username atau password salah!");
+            }
+        }
+
+        function handleLogout() {
+            sessionStorage.removeItem('isAdminLoggedIn');
+            switchView('user');
+        }
+
+        async function loadAdminData() {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Memuat data...</td></tr>`;
+
+            const res = await callApi({ action: 'getAll' });
+
+            if (res.status === 'success' && res.data) {
+                allAdminData = res.data;
+                renderTable();
+            } else {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-rose-500">Gagal memuat data dari Spreadsheet.</td></tr>`;
+            }
+        }
+
+        function filterTab(status) {
+            currentTabFilter = status;
+            
+            ['ALL', 'BELUM DI KERJAKAN', 'PROSES DIKERJAKAN', 'SELESAI'].forEach(st => {
+                const btnId = st === 'ALL' ? 'tabALL' : (st.includes('BELUM') ? 'tabBELUM' : (st.includes('PROSES') ? 'tabPROSES' : 'tabSELESAI'));
+                const btn = document.getElementById(btnId);
+                if (st === status) {
+                    btn.className = "px-4 py-2 rounded-xl text-sm font-semibold transition bg-indigo-600 text-white shadow-sm";
+                } else {
+                    btn.className = "px-4 py-2 rounded-xl text-sm font-semibold transition bg-white text-slate-600 hover:bg-slate-100 border border-slate-200";
+                }
+            });
+
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('adminTableBody');
+            
+            let filteredData = allAdminData;
+            if (currentTabFilter !== 'ALL') {
+                filteredData = allAdminData.filter(item => item.status === currentTabFilter);
+            }
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Tidak ada data pada kategori ini.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filteredData.map(item => {
+                let selectColorClass = "text-rose-700 bg-rose-50 border-rose-200";
+                if (item.status === 'PROSES DIKERJAKAN') {
+                    selectColorClass = "text-amber-700 bg-amber-50 border-amber-200";
+                } else if (item.status === 'SELESAI') {
+                    selectColorClass = "text-emerald-700 bg-emerald-50 border-emerald-200";
+                }
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="p-4 font-mono font-bold text-indigo-600">${item.kode}</td>
+                        <td class="p-4 font-medium text-slate-900">${item.nama}</td>
+                        <td class="p-4 text-slate-600">${item.laptop}</td>
+                        <td class="p-4 text-slate-600 max-w-xs truncate">${item.keluhan}</td>
+                        <td class="p-4">
+                            <select onchange="updateStatus('${item.kode}', this.value)" class="text-xs font-semibold px-3 py-1.5 rounded-lg border focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer ${selectColorClass}">
+                                <option value="BELUM DI KERJAKAN" ${item.status === 'BELUM DI KERJAKAN' ? 'selected' : ''}>BELUM DI KERJAKAN</option>
+                                <option value="PROSES DIKERJAKAN" ${item.status === 'PROSES DIKERJAKAN' ? 'selected' : ''}>PROSES DIKERJAKAN</option>
+                                <option value="SELESAI" ${item.status === 'SELESAI' ? 'selected' : ''}>SELESAI</option>
+                            </select>
+                        </td>
+                        <td class="p-4 text-center flex items-center justify-center gap-2">
+                            <button onclick="printNota('${item.kode}', '${item.nama}', '${item.laptop}', '${item.keluhan.replace(/'/g, "\\'")}')" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5" title="Cetak Nota & QR">
+                                <i class="fa-solid fa-print"></i> Cetak Nota
+                            </button>
+                            <button onclick="navigator.clipboard.writeText('${item.kode}'); alert('Kode ${item.kode} disalin!');" class="text-slate-400 hover:text-indigo-600 px-2 py-1 transition" title="Salin Kode">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function openAddModal() { document.getElementById('addModal').classList.remove('hidden'); }
+        function closeAddModal() { document.getElementById('addModal').classList.add('hidden'); document.getElementById('addForm').reset(); }
+
+        async function handleAddService(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitAddBtn');
+            const nama = document.getElementById('addNama').value;
+            const laptop = document.getElementById('addLaptop').value;
+            const keluhan = document.getElementById('addKeluhan').value;
+
+            const kode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            btn.innerText = "Menyimpan...";
+            btn.disabled = true;
+
+            const res = await callApi({
+                action: 'create',
+                data: { kode: kode, nama: nama, laptop: laptop, keluhan: keluhan, status: 'BELUM DI KERJAKAN' }
+            });
+
+            btn.innerText = "Simpan & Buat Kode";
+            btn.disabled = false;
+
+            if (res.status === 'success') {
+                alert(`Data berhasil ditambahkan!\nKode Unik Pelanggan: ${kode}`);
+                closeAddModal();
+                loadAdminData();
+            } else {
+                alert("Gagal menyimpan data: " + res.message);
+            }
+        }
+
+        async function updateStatus(kode, newStatus) {
+            const item = allAdminData.find(d => d.kode === kode);
+            if (item) item.status = newStatus;
+            
+            renderTable();
+
+            const res = await callApi({ action: 'update', kode: kode, status: newStatus });
+            if (res.status !== 'success') {
+                alert("Gagal memperbarui status di database!");
+                loadAdminData();
+            }
+        }
+
+        function printNota(kode, nama, laptop, keluhan) {
+            document.getElementById('printKode').innerText = kode;
+            document.getElementById('printNama').innerText = nama;
+            document.getElementById('printLaptop').innerText = laptop;
+            document.getElementById('printKeluhan').innerText = keluhan;
+
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('printTanggal').innerText = "Tanggal: " + new Date().toLocaleDateString('id-ID', options);
+
+            const currentUrl = window.location.href.split('?')[0];
+            const targetTrackingUrl = `${currentUrl}?code=${kode}`;
+
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.replaceChildren();
+
+            new QRCode(qrContainer, {
+                text: targetTrackingUrl,
+                width: 130,
+                height: 130,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.M
+            });
+
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        }
+    </script>
+</body>
+</html>
